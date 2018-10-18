@@ -5,6 +5,16 @@ import functools as fnt
 VALUES = set([x + 1 for x in range(9)])
 
 
+def filter_map(fn, it):
+    """
+    Map and filter values. If a value is mapped to None, then it will be filtered.
+    :param fn: Function used to map values.
+    :param it: Values over which the function should run.
+    :return: A filter_map iterator which yeilds non-None values mapped by the function.
+    """
+    return filter(lambda x: x is not None, map(fn, it))
+
+
 def calc_earmarks(board):
     def get_row(board, r):
         s = set(board[r])
@@ -12,9 +22,7 @@ def calc_earmarks(board):
         return s
 
     def get_col(board, c):
-        s = set()
-        for r in range(9):
-            s.add(board[r][c])
+        s = {board[r][c] for r in range(9)}
         s.discard(0)
         return s
 
@@ -60,69 +68,60 @@ def update_earmarks(earmarks, newval, r, c):
             earmarks[r2][c2].discard(newval)
 
 
-def get_possible_row(earmarks, r, c):
-    possible_row = set()  # values which can be placed somewhere else in the row
-    for c2 in range(9):
-        if c2 != c:
-            possible_row |= earmarks[r][c2]
-    return possible_row
-
-
-def get_possible_col(earmarks, r, c):
-    possible_col = set()  # values which can be placed somewhere else in the column
-    for r2 in range(9):
-        if r2 != r:
-            possible_col |= earmarks[r2][c]
-    return possible_col
-
-
-def get_possible_box(earmarks, r, c):
-    possible_box = set()  # values which can be placed somewhere else in the box
-    for r2 in range((r // 3) * 3, (r // 3) * 3 + 3):
-        for c2 in range((c // 3) * 3, (c // 3) * 3 + 3):
-            if r2 != r or c2 != c:
-                possible_box |= earmarks[r2][c2]
-    return possible_box
-
-
 def set_val(board, earmarks, newval, r, c):
     board[r][c] = newval
     update_earmarks(earmarks, newval, r, c)
 
 
 def simple_fill(board, earmarks):
+    def get_possible_row(earmarks, r, c):
+        # Values which can be placed somewhere else in the row
+        return fnt.reduce(set.__or__, map(lambda c2: set() if c2 == c else earmarks[r][c2], range(9)))
+
+    def get_possible_col(earmarks, r, c):
+        # Values which can be placed somewhere else in the column
+        return fnt.reduce(set.__or__, map(lambda r2: set() if r2 == r else earmarks[r2][c], range(9)))
+
+    def get_possible_box(earmarks, r, c):
+        # Values which can be placed somewhere else in the box
+        possible_box = set()
+        for r2 in range((r // 3) * 3, (r // 3) * 3 + 3):
+            for c2 in range((c // 3) * 3, (c // 3) * 3 + 3):
+                if r2 != r or c2 != c:
+                    possible_box |= earmarks[r2][c2]
+        return possible_box
+
     changed = set()
-    for r in range(9):
-        for c in range(9):
-            if board[r][c] != 0:
-                continue
+    for (r, c) in map(lambda i: (i // 9, i % 9), range(9**2)):
+        if board[r][c] != 0:
+            continue
 
-            possible = earmarks[r][c]
-            assert len(possible) > 0
+        possible = earmarks[r][c]
+        assert len(possible) > 0
 
-            # Single Candidate
-            if len(possible) == 1:
-                val = possible.pop()
-                print("Single Candidate: ({}, {}), Val {}".format(r, c, val))
+        # Single Candidate
+        if len(possible) == 1:
+            val = possible.pop()
+            print("Single Candidate: ({}, {}), Val {}".format(r, c, val))
+            set_val(board, earmarks, val, r, c)
+            changed.add((r, c))
+            continue
+
+        # Single Position
+        # check if any of the possible values can only be in this loc for each the row, col, and box.
+        possible_row = get_possible_row(earmarks, r, c)
+        possible_col = get_possible_col(earmarks, r, c)
+        possible_box = get_possible_box(earmarks, r, c)
+
+        for i, possible_x in enumerate([possible_col, possible_row, possible_box]):
+            p = possible - possible_x
+            assert len(p) <= 1
+            if len(p) == 1:
+                val = p.pop()
+                print("Single Position ({}): ({}, {}), Val {}".format(['Col', 'Row', 'Box'][i], r, c, val))
                 set_val(board, earmarks, val, r, c)
                 changed.add((r, c))
-                continue
-
-            # Single Position
-            # check if any of the possible values can only be in this loc for each the row, col, and box.
-            possible_row = get_possible_row(earmarks, r, c)
-            possible_col = get_possible_col(earmarks, r, c)
-            possible_box = get_possible_box(earmarks, r, c)
-
-            for i, possible_x in enumerate([possible_col, possible_row, possible_box]):
-                p = possible - possible_x
-                assert len(p) <= 1
-                if len(p) == 1:
-                    val = p.pop()
-                    print("Single Position ({}): ({}, {}), Val {}".format(['Col', 'Row', 'Box'][i], r, c, val))
-                    set_val(board, earmarks, val, r, c)
-                    changed.add((r, c))
-                    break
+                break
     return changed
 
 
@@ -183,7 +182,7 @@ def tuples(earmarks):
 
     # For each row
     for r in range(9):
-        empty_cells = set(filter(lambda x: x is not None, map(lambda c: c if len(earmarks[r][c]) > 0 else None, range(9))))
+        empty_cells = set(filter_map(lambda c: c if len(earmarks[r][c]) > 0 else None, range(9)))
         m = len(empty_cells)
 
         if m < 3:
@@ -209,9 +208,9 @@ def tuples(earmarks):
                     for c in T:
                         earmarks[r][c] &= HmG
 
-    # # For each column
+    # For each column
     for c in range(9):
-        empty_cells = set(filter(lambda x: x is not None, map(lambda r: None if len(earmarks[r][c]) == 0 else r, range(9))))
+        empty_cells = set(filter_map(lambda r: None if len(earmarks[r][c]) == 0 else r, range(9)))
         m = len(empty_cells)
 
         if m < 3:
@@ -237,7 +236,7 @@ def tuples(earmarks):
                     for r in T:
                         earmarks[r][c] &= HmG
 
-    # # For each box
+    # For each box
     for i in range(9):
         br = (i // 3) * 3
         bc = (i % 3) * 3
@@ -248,7 +247,7 @@ def tuples(earmarks):
         def c(j):
             return bc + (j % 3)
 
-        empty_cells = set(filter(lambda x: x is not None, map(lambda j: None if len(earmarks[r(j)][c(j)]) == 0 else j, range(9))))
+        empty_cells = set(filter_map(lambda j: None if len(earmarks[r(j)][c(j)]) == 0 else j, range(9)))
         m = len(empty_cells)
 
         if m < 3:
@@ -257,10 +256,10 @@ def tuples(earmarks):
 
         # For each size of tuple
         for n in reversed(range(2, m)):
-            for T in map(lambda t: set(t), itt.combinations(empty_cells, n)):
+            for T in map(set, itt.combinations(empty_cells, n)):
                 Tcomp = empty_cells - T
-                H = fnt.reduce(lambda A, B: A | B, map(lambda j: earmarks[r(j)][c(j)], T))
-                G = fnt.reduce(lambda A, B: A | B, map(lambda j: earmarks[r(j)][c(j)], Tcomp))
+                H = fnt.reduce(set.__or__, map(lambda j: earmarks[r(j)][c(j)], T))
+                G = fnt.reduce(set.__or__, map(lambda j: earmarks[r(j)][c(j)], Tcomp))
                 HmG = H - G
 
                 if len(H) == n:
