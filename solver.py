@@ -1,8 +1,18 @@
 import itertools as itt
 import functools as fnt
 
-# Largely inspired by https://www.sudokuoftheday.com/techniques/
+# This code is largely inspired by https://www.sudokuoftheday.com/techniques/
+
+
 VALUES = set([x + 1 for x in range(9)])
+
+
+class InvalidGameState(Exception):
+    pass
+
+
+def row_col_iter():
+    return map(lambda i: (i // 9, i % 9), range(9**2))
 
 
 def filter_map(fn, it):
@@ -92,12 +102,13 @@ def simple_fill(board, earmarks):
         return possible_box
 
     changed = set()
-    for (r, c) in map(lambda i: (i // 9, i % 9), range(9**2)):
+    for (r, c) in row_col_iter():
         if board[r][c] != 0:
             continue
 
         possible = earmarks[r][c]
-        assert len(possible) > 0
+        if len(possible) <= 0:
+            raise InvalidGameState("No possibilities left for ({}, {}).".format(r, c))
 
         # Single Candidate
         if len(possible) == 1:
@@ -115,8 +126,9 @@ def simple_fill(board, earmarks):
 
         for i, possible_x in enumerate([possible_col, possible_row, possible_box]):
             p = possible - possible_x
-            assert len(p) <= 1
-            if len(p) == 1:
+            if len(p) > 1:
+                raise InvalidGameState("Multiple values must be placed at ({}, {}).".format(r, c))
+            elif len(p) == 1:
                 val = p.pop()
                 print("Single Position ({}): ({}, {}), Val {}".format(['Col', 'Row', 'Box'][i], r, c, val))
                 set_val(board, earmarks, val, r, c)
@@ -154,6 +166,7 @@ def candidate_lines(earmarks):
         for j in range(3):
             if len(rows[j]) == 0:
                 continue
+            # TODO: only print if it changes anything
             print("Candidate Line: Box {}, Row {}, Values {}".format(i, br + j, rows[j]))
             for c in itt.chain(range(bc), range(bc + 3, 9)):
                 earmarks[br + j][c] -= rows[j]
@@ -161,6 +174,7 @@ def candidate_lines(earmarks):
         for j in range(3):
             if len(cols[j]) == 0:
                 continue
+            # TODO: only print if it changes anything
             print("Candidate Line: Box {}, Col {}, Values {}".format(i, bc + j, cols[j]))
             for r in itt.chain(range(br), range(br + 3, 9)):
                 earmarks[r][bc + j] -= cols[j]
@@ -199,11 +213,13 @@ def tuples(earmarks):
 
                 if len(H) == n:
                     # naked n-tuple
+                    # TODO: only print if it changes anything
                     print("Naked {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, H))
                     for c in Tcomp:
                         earmarks[r][c] -= H
                 elif len(HmG) == n:
                     # hidden n-tuple
+                    # TODO: only print if it changes anything
                     print("Hidden {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, HmG))
                     for c in T:
                         earmarks[r][c] &= HmG
@@ -227,11 +243,13 @@ def tuples(earmarks):
 
                 if len(H) == n:
                     # naked n-tuple
+                    # TODO: only print if it changes anything
                     print("Naked {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, H))
                     for r in Tcomp:
                         earmarks[r][c] -= H
                 elif len(HmG) == n:
                     # hidden n-tuple
+                    # TODO: only print if it changes anything
                     print("Hidden {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, HmG))
                     for r in T:
                         earmarks[r][c] &= HmG
@@ -264,11 +282,13 @@ def tuples(earmarks):
 
                 if len(H) == n:
                     # naked n-tuple
+                    # TODO: only print if it changes anything
                     print("Naked {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
                     for j in Tcomp:
                         earmarks[r(j)][c(j)] -= H
                 elif len(HmG) == n:
                     # hidden n-tuple
+                    # TODO: only print if it changes anything
                     print("Hidden {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
                     for j in T:
                         earmarks[r(j)][c(j)] &= HmG
@@ -279,8 +299,10 @@ def fill(board, earmarks):
 
     # Eliminate any possibilities we can
     candidate_lines(earmarks)
+    # TODO: only print if changes were made
     print_earmarks(earmarks)
     tuples(earmarks)
+    # TODO: only print if changes were made
     print_earmarks(earmarks)
 
     # Filling anything we can
@@ -341,13 +363,12 @@ def print_all(b, e, highlight=None):
 
 def solved(board):
     for r in board:
-        for c in r:
-            if c == 0:
-                return False
+        if not all(r):
+            return False
     return True
 
 
-def main():
+def read_board():
     board = []
     for _ in range(9):
         r = []
@@ -357,17 +378,81 @@ def main():
             r.append(int(i))
         assert len(r) == 9
         board.append(r)
+    return board
 
+
+def find_cell_with_least_possible(earmarks):
+    # find first cell that has only two options, if none have two options, then pick one with three, and so on.
+    for n in range(2, 5):
+        for (r, c) in row_col_iter():
+            if len(earmarks[r][c]) == n:
+                return (r, c)
+
+    return None
+
+
+def clone_board(board):
+    return [r.copy() for r in board]
+
+
+def clone_earmarks(earmarks):
+    return [[c.copy() for c in r] for r in earmarks]
+
+
+def solve(board, earmarks, d=0):
+    done = False
+    try:
+        while not done and fill(board, earmarks):
+            done = solved(board)
+    except InvalidGameState as e:
+        if d == 0:
+            print("No solution found! {}".format(e))
+            raise InvalidGameState("All paths are invalid!")
+        else:
+            print_earmarks(earmarks)
+            print("Nisho Failed: {} Stepping up to Depth {}.".format(e, d - 1))
+            return None, None
+
+    if done:
+        return board, earmarks
+
+    # If not yet solved, perform Nisho
+    cell = find_cell_with_least_possible(earmarks)
+    if cell is None:
+        raise InvalidGameState("No cells we can guess with but the game is not solved.")
+
+    (r, c) = cell
+    for p in earmarks[r][c]:
+        board2 = clone_board(board)
+        earmarks2 = clone_earmarks(earmarks)
+        set_val(board2, earmarks2, p, r, c)
+        print("\n\nPerforming Nisho: ({}, {}), Depth {}, Possible {}, Chosen {}".format(r, c, d+1, earmarks[r][c], p))
+        print_all(board2, earmarks2, highlight={(r, c)})
+
+        board2, earmarks2 = solve(board2, earmarks2, d+1)
+
+        if board2 is not None and earmarks2 is not None:
+            return board2, earmarks2
+
+    if d == 0:
+        print("No solution found!")
+        raise InvalidGameState("All paths are invalid!")
+    else:
+        print_earmarks(earmarks)
+        print("Nisho Failed: All possibilities for ({}, {}) are invalid. Stepping up to Depth {}.".format(r, c, d - 1))
+        return None, None
+
+
+def main():
+    board = read_board()
     earmarks = calc_earmarks(board)
     print_all(board, earmarks)
 
-    while not solved(board) and fill(board, earmarks):
-        pass
-
-    if solved(board):
+    try:
+        board, _ = solve(board, earmarks)
         print_board(board)
-    else:
-        print_all(board, earmarks)
+    except InvalidGameState as e:
+        print(e)
 
 
 if __name__ == '__main__':
