@@ -207,122 +207,47 @@ def tuples(earmarks):
 
     changed = False
 
-    # For each row
-    for r in range(9):
-        empty_cells = set(filter_map(lambda c: c if len(earmarks[r][c]) > 0 else None, range(9)))
-        m = len(empty_cells)
+    def for_grp(r, c, grp_name):
+        changed = False
+        for i in range(9):
+            empty_cells = set(filter_map(lambda j: None if len(earmarks[r(i,j)][c(i,j)]) == 0 else j, range(9)))
+            m = len(empty_cells)
 
-        if m < 3:
-            # 2-tuples at a minimum, and need an outside group so...
-            continue
+            if m < 3:
+                # 2-tuples at a minimum, and need an outside group so...
+                continue
 
-        # For each size of tuple
-        for n in reversed(range(2, m)):
-            for T in map(lambda t: set(t), itt.combinations(empty_cells, n)):
-                Tcomp = empty_cells - T
-                H = fnt.reduce(lambda A, B: A | B, map(lambda c: earmarks[r][c], T))
-                G = fnt.reduce(lambda A, B: A | B, map(lambda c: earmarks[r][c], Tcomp))
-                HmG = H - G
+            # For each size of tuple
+            for n in reversed(range(2, m)):
+                for T in map(set, itt.combinations(empty_cells, n)):
+                    Tcomp = empty_cells - T
+                    H = fnt.reduce(set.__or__, map(lambda j: earmarks[r(i,j)][c(i,j)], T))
+                    G = fnt.reduce(set.__or__, map(lambda j: earmarks[r(i,j)][c(i,j)], Tcomp))
+                    HmG = H - G
 
-                if len(H) == n:
-                    # naked n-tuple
-                    useful = False
-                    for c in Tcomp:
-                        useful |= len(earmarks[r][c] & H) > 0
-                        earmarks[r][c] -= H
-                    if useful:
-                        print("Naked {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, H))
-                        changed = True
-                elif len(HmG) == n:
-                    # hidden n-tuple
-                    useful = False
-                    for c in T:
-                        useful |= len(earmarks[r][c] | HmG) > len(earmarks[r][c] & HmG)
-                        earmarks[r][c] &= HmG
-                    if useful:
-                        print("Hidden {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, HmG))
-                        changed = True
+                    if len(H) == n:
+                        # naked n-tuple
+                        useful = False
+                        for j in Tcomp:
+                            useful |= len(earmarks[r(i,j)][c(i,j)] & H) > 0
+                            earmarks[r(i,j)][c(i,j)] -= H
+                        if useful:
+                            print("Naked {}-Tuple: {} {}, Cells {}, Values {}".format(n, grp_name, i, T, HmG))
+                            changed = True
+                    elif len(HmG) == n:
+                        # hidden n-tuple
+                        useful = False
+                        for j in T:
+                            useful |= len(earmarks[r(i,j)][c(i,j)] | HmG) > len(earmarks[r(i,j)][c(i,j)] & HmG)
+                            earmarks[r(i,j)][c(i,j)] &= HmG
+                        if useful:
+                            print("Hidden {}-Tuple: {} {}, Cells {}, Values {}".format(n, grp_name, i, T, HmG))
+                            changed = True
+        return changed
 
-    # For each column
-    for c in range(9):
-        empty_cells = set(filter_map(lambda r: None if len(earmarks[r][c]) == 0 else r, range(9)))
-        m = len(empty_cells)
-
-        if m < 3:
-            # 2-tuples at a minimum, and need an outside group so...
-            continue
-
-        # For each size of tuple
-        for n in reversed(range(2, m)):
-            for T in map(lambda t: set(t), itt.combinations(empty_cells, n)):
-                Tcomp = empty_cells - T
-                H = fnt.reduce(lambda A, B: A | B, map(lambda r: earmarks[r][c], T))
-                G = fnt.reduce(lambda A, B: A | B, map(lambda r: earmarks[r][c], Tcomp))
-                HmG = H - G
-
-                if len(H) == n:
-                    # naked n-tuple
-                    useful = False
-                    for r in Tcomp:
-                        useful |= len(earmarks[r][c] & H) > 0
-                        earmarks[r][c] -= H
-                    if useful:
-                        print("Naked {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, H))
-                        changed = True
-                elif len(HmG) == n:
-                    # hidden n-tuple
-                    useful = False
-                    for r in T:
-                        useful |= len(earmarks[r][c] | HmG) > len(earmarks[r][c] & HmG)
-                        earmarks[r][c] &= HmG
-                    if useful:
-                        print("Hidden {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, HmG))
-                        changed = True
-
-    # For each box
-    for i in range(9):
-        br = (i // 3) * 3
-        bc = (i % 3) * 3
-
-        def r(j):
-            return br + (j // 3)
-
-        def c(j):
-            return bc + (j % 3)
-
-        empty_cells = set(filter_map(lambda j: None if len(earmarks[r(j)][c(j)]) == 0 else j, range(9)))
-        m = len(empty_cells)
-
-        if m < 3:
-            # 2-tuples at a minimum, and need an outside group so...
-            continue
-
-        # For each size of tuple
-        for n in reversed(range(2, m)):
-            for T in map(set, itt.combinations(empty_cells, n)):
-                Tcomp = empty_cells - T
-                H = fnt.reduce(set.__or__, map(lambda j: earmarks[r(j)][c(j)], T))
-                G = fnt.reduce(set.__or__, map(lambda j: earmarks[r(j)][c(j)], Tcomp))
-                HmG = H - G
-
-                if len(H) == n:
-                    # naked n-tuple
-                    useful = False
-                    for j in Tcomp:
-                        useful |= len(earmarks[r(j)][c(j)] & H) > 0
-                        earmarks[r(j)][c(j)] -= H
-                    if useful:
-                        print("Naked {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
-                        changed = True
-                elif len(HmG) == n:
-                    # hidden n-tuple
-                    useful = False
-                    for j in T:
-                        useful |= len(earmarks[r(j)][c(j)] | HmG) > len(earmarks[r(j)][c(j)] & HmG)
-                        earmarks[r(j)][c(j)] &= HmG
-                    if useful:
-                        print("Hidden {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
-                        changed = True
+    changed |= for_grp(lambda i, j: i, lambda i, j: j, "Row")
+    changed |= for_grp(lambda i, j: j, lambda i, j: i, "Col")
+    changed |= for_grp(lambda i, j: (i // 3) * 3 + (j // 3), lambda i, j: (i % 3) * 3 + (j % 3), "Box")
     return changed
 
 
