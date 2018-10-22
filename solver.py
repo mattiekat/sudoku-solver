@@ -12,6 +12,10 @@ class InvalidGameState(Exception):
 
 
 def row_col_iter():
+    """
+    Construct an iterator over the rows and columns.
+    :return: An iterator over the rows and columns which will return tuples in the form (r, c).
+    """
     return map(lambda i: (i // 9, i % 9), range(9**2))
 
 
@@ -26,6 +30,11 @@ def filter_map(fn, it):
 
 
 def calc_earmarks(board):
+    """
+    Calculate a base set of earmarks based on what numbers can obviously not be placed at a given location.
+    :param board: Sudoku board with known values.
+    :return: A 9x9 list of sets, each set containing the values which are possible for the each cell at that location..
+    """
     def get_row(board, r):
         s = set(board[r])
         s.discard(0)
@@ -44,7 +53,6 @@ def calc_earmarks(board):
         s.discard(0)
         return s
 
-    # TODO: Consider using u16 and bit-logic instead of sets to make operations more efficient
     earmarks = [[set() for _ in range(9)] for _ in range(9)]
     for c in range(9):
         col = get_col(board, c)
@@ -61,6 +69,14 @@ def calc_earmarks(board):
 
 
 def update_earmarks(earmarks, newval, r, c):
+    """
+    Update earmarks if a value is set on the board. This will remove that `newvalue` form the row, col, and box groups
+    as it will no longer be possible in any of those locations.
+    :param earmarks: 9x9 list of possible values for each cell.
+    :param newval: The value which is to be removed removed from the possibilities.
+    :param r: Row the new value is placed at.
+    :param c: Column the new value is placed at.
+    """
     # update row, col, and group to no longer include the newly placed value as an option
     earmarks[r][c] = set()
 
@@ -79,11 +95,25 @@ def update_earmarks(earmarks, newval, r, c):
 
 
 def set_val(board, earmarks, newval, r, c):
+    """
+    Set a value on the board and update earmarks appropriately.
+    :param board: Sudoku board with known values.
+    :param earmarks: 9x9 list of possible values for each cell.
+    :param newval: The value which is to be set at the location.
+    :param r: Row the new value is placed at.
+    :param c: Column the new value is placed at.
+    """
     board[r][c] = newval
     update_earmarks(earmarks, newval, r, c)
 
 
 def simple_fill(board, earmarks):
+    """
+    Check for single candidate or single position events which mean we can trivially decide what a cell must be.
+    :param board: Sudoku board with known values.
+    :param earmarks: 9x9 list of possible values for each cell.
+    :return: Whether any changes were made to board or earmarks.
+    """
     def get_possible_row(earmarks, r, c):
         # Values which can be placed somewhere else in the row
         return fnt.reduce(set.__or__, map(lambda c2: set() if c2 == c else earmarks[r][c2], range(9)))
@@ -138,8 +168,12 @@ def simple_fill(board, earmarks):
 
 
 def candidate_lines(earmarks):
-    # If the possibilities for a given number in a group are all in a line on a row or column, then we can remove
-    # those as possibilities from the rest of the row/column
+    """
+    If the possibilities for a given number in a group are all in a line on a row or column, then we can remove those as
+    possibilities from the rest of the row/column.
+    :param earmarks: 9x9 list of possible values for each cell.
+    :return: Whether any changes to earmarks were made.
+    """
     changed = False
 
     for i in range(9):  # for each of the boxes
@@ -192,19 +226,25 @@ def candidate_lines(earmarks):
 
 
 def tuples(earmarks):
-    # Let T be a set of n cells in the same group (i.e. row, col, or box)
-    # Let H be the union of all possibilities for cells in T
-    # Let G be the union of all possibilities for T^c (compliment of T)
-    #
-    # T is a naked n-tuple if card(H) = n.
-    # T is a hidden n-tuple if card(H) > n and card(H - G) = n.
-    #
-    # If a naked n-tuple is found, then the possibilities for each cell in T^c must be disjoint from H.
-    # i.e. remove values within the naked tuple from the other cells in the group.
-    #
-    # If a hidden n-tuple is found, for each cell c in T, the possibilities of c must be in (H - G).
-    # i.e. remove any values in the hidden tuple which are not unique to the set of cells (T).
+    """
+    Find tuples which can be used to reduce the possibilities any cells.
 
+    Let T be a set of n cells in the same group (i.e. row, col, or box)
+    Let H be the union of all possibilities for cells in T
+    Let G be the union of all possibilities for T^c (compliment of T)
+
+    T is a naked n-tuple if card(H) = n.
+    T is a hidden n-tuple if card(H) > n and card(H - G) = n.
+
+    If a naked n-tuple is found, then the possibilities for each cell in T^c must be disjoint from H.
+    i.e. remove values within the naked tuple from the other cells in the group.
+
+    If a hidden n-tuple is found, for each cell c in T, the possibilities of c must be in (H - G).
+    i.e. remove any values in the hidden tuple which are not unique to the set of cells (T).
+
+    :param earmarks: 9x9 list of possible values for each cell.
+    :return: Whether any changes to earmarks were made.
+    """
     changed = False
 
     def for_grp(r, c, grp_name):
@@ -252,6 +292,12 @@ def tuples(earmarks):
 
 
 def fill(board, earmarks):
+    """
+    Attempt to fill the board with values and update earmarks.
+    :param board: Sudoku board with known values.
+    :param earmarks: 9x9 list of possible values for each cell.
+    :return: Whether the board was modified (and earmarks to an extent).
+    """
     changed = False
 
     # Eliminate any possibilities we can
@@ -317,6 +363,12 @@ def print_all(b, e, highlight=None):
 
 
 def solved(board):
+    """
+    Check if the board has been solved by searching for an unset value. This works because we have the rules such that
+    no invalid plays may be made; hence the board will be full iff the game is solved.
+    :param board: Sudoku board with known values.
+    :return: Whether it is solved.
+    """
     for r in board:
         if not all(r):
             return False
@@ -324,6 +376,10 @@ def solved(board):
 
 
 def read_board():
+    """
+    Read in the board from standard input.
+    :return: The Sudoku board.
+    """
     board = []
     for _ in range(9):
         r = []
@@ -336,16 +392,6 @@ def read_board():
     return board
 
 
-def find_cell_with_least_possible(earmarks):
-    # find first cell that has only two options, if none have two options, then pick one with three, and so on.
-    for n in range(2, 5):
-        for (r, c) in row_col_iter():
-            if len(earmarks[r][c]) == n:
-                return (r, c)
-
-    return None
-
-
 def clone_board(board):
     return [r.copy() for r in board]
 
@@ -355,6 +401,21 @@ def clone_earmarks(earmarks):
 
 
 def solve(board, earmarks, d=0):
+    """
+    The master solving function which orchestrats the rest and allows for Nisho and DFS branching as needed.
+    :param board: Sudoku board with known values.
+    :param earmarks: 9x9 list of possible values for each cell.
+    :param d: Depth of this call, starting at 0. (To track how many guesses have been made to get to the current state).
+    :return: The board and earmarks if it has solved the board, and None, None if it reaches an invalid state.
+    """
+    # find first cell that has only two options, if none have two options, then pick one with three, and so on.
+    def find_cell_with_least_possible(earmarks):
+        for n in range(2, 5):
+            for (r, c) in row_col_iter():
+                if len(earmarks[r][c]) == n:
+                    return (r, c)
+        return None
+
     done = False
     try:
         while not done and fill(board, earmarks):
@@ -399,6 +460,10 @@ def solve(board, earmarks, d=0):
 
 
 def main():
+    """
+    Read in a Sudoku board and attempt to solve it. Any board which is not solved has no valid solution (or there is a
+    bug).
+    """
     board = read_board()
     earmarks = calc_earmarks(board)
     print_all(board, earmarks)
