@@ -140,6 +140,8 @@ def simple_fill(board, earmarks):
 def candidate_lines(earmarks):
     # If the possibilities for a given number in a group are all in a line on a row or column, then we can remove
     # those as possibilities from the rest of the row/column
+    changed = False
+
     for i in range(9):  # for each of the boxes
         # Calculate the base row and col
         br = (i // 3) * 3
@@ -166,18 +168,27 @@ def candidate_lines(earmarks):
         for j in range(3):
             if len(rows[j]) == 0:
                 continue
-            # TODO: only print if it changes anything
-            print("Candidate Line: Box {}, Row {}, Values {}".format(i, br + j, rows[j]))
+
+            useful = False
             for c in itt.chain(range(bc), range(bc + 3, 9)):
+                useful |= len(earmarks[br + j][c] & rows[j]) > 0
                 earmarks[br + j][c] -= rows[j]
+            if useful:
+                print("Candidate Line: Box {}, Row {}, Values {}".format(i, br + j, rows[j]))
+                changed = True
 
         for j in range(3):
             if len(cols[j]) == 0:
                 continue
-            # TODO: only print if it changes anything
-            print("Candidate Line: Box {}, Col {}, Values {}".format(i, bc + j, cols[j]))
+
+            useful = False
             for r in itt.chain(range(br), range(br + 3, 9)):
+                useful |= len(earmarks[r][bc + j] & cols[j]) > 0
                 earmarks[r][bc + j] -= cols[j]
+            if useful:
+                print("Candidate Line: Box {}, Col {}, Values {}".format(i, bc + j, cols[j]))
+                changed = True
+    return changed
 
 
 def tuples(earmarks):
@@ -193,6 +204,8 @@ def tuples(earmarks):
     #
     # If a hidden n-tuple is found, for each cell c in T, the possibilities of c must be in (H - G).
     # i.e. remove any values in the hidden tuple which are not unique to the set of cells (T).
+
+    changed = False
 
     # For each row
     for r in range(9):
@@ -213,16 +226,22 @@ def tuples(earmarks):
 
                 if len(H) == n:
                     # naked n-tuple
-                    # TODO: only print if it changes anything
-                    print("Naked {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, H))
+                    useful = False
                     for c in Tcomp:
+                        useful |= len(earmarks[r][c] & H) > 0
                         earmarks[r][c] -= H
+                    if useful:
+                        print("Naked {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, H))
+                        changed = True
                 elif len(HmG) == n:
                     # hidden n-tuple
-                    # TODO: only print if it changes anything
-                    print("Hidden {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, HmG))
+                    useful = False
                     for c in T:
+                        useful |= len(earmarks[r][c] | HmG) > len(earmarks[r][c] & HmG)
                         earmarks[r][c] &= HmG
+                    if useful:
+                        print("Hidden {}-Tuple: Row {}, Cells {}, Values {}".format(n, r, T, HmG))
+                        changed = True
 
     # For each column
     for c in range(9):
@@ -243,16 +262,22 @@ def tuples(earmarks):
 
                 if len(H) == n:
                     # naked n-tuple
-                    # TODO: only print if it changes anything
-                    print("Naked {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, H))
+                    useful = False
                     for r in Tcomp:
+                        useful |= len(earmarks[r][c] & H) > 0
                         earmarks[r][c] -= H
+                    if useful:
+                        print("Naked {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, H))
+                        changed = True
                 elif len(HmG) == n:
                     # hidden n-tuple
-                    # TODO: only print if it changes anything
-                    print("Hidden {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, HmG))
+                    useful = False
                     for r in T:
+                        useful |= len(earmarks[r][c] | HmG) > len(earmarks[r][c] & HmG)
                         earmarks[r][c] &= HmG
+                    if useful:
+                        print("Hidden {}-Tuple: Col {}, Cells {}, Values {}".format(n, c, T, HmG))
+                        changed = True
 
     # For each box
     for i in range(9):
@@ -282,28 +307,33 @@ def tuples(earmarks):
 
                 if len(H) == n:
                     # naked n-tuple
-                    # TODO: only print if it changes anything
-                    print("Naked {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
+                    useful = False
                     for j in Tcomp:
+                        useful |= len(earmarks[r(j)][c(j)] & H) > 0
                         earmarks[r(j)][c(j)] -= H
+                    if useful:
+                        print("Naked {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
+                        changed = True
                 elif len(HmG) == n:
                     # hidden n-tuple
-                    # TODO: only print if it changes anything
-                    print("Hidden {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
+                    useful = False
                     for j in T:
+                        useful |= len(earmarks[r(j)][c(j)] | HmG) > len(earmarks[r(j)][c(j)] & HmG)
                         earmarks[r(j)][c(j)] &= HmG
+                    if useful:
+                        print("Hidden {}-Tuple: Box {}, Cells {}, Values {}".format(n, i, T, HmG))
+                        changed = True
+    return changed
 
 
 def fill(board, earmarks):
     changed = False
 
     # Eliminate any possibilities we can
-    candidate_lines(earmarks)
-    # TODO: only print if changes were made
-    print_earmarks(earmarks)
-    tuples(earmarks)
-    # TODO: only print if changes were made
-    print_earmarks(earmarks)
+    if candidate_lines(earmarks):
+        print_earmarks(earmarks)
+    if tuples(earmarks):
+        print_earmarks(earmarks)
 
     # Filling anything we can
     while True:
