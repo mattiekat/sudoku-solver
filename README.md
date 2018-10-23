@@ -12,6 +12,28 @@ Much of the following logic was determined from examples provided by
 [sudokuoftheday](https://www.sudokuoftheday.com/techniques/) which were then converted to be in terms of
 set-theory to enable this solver.
 
+## How to Use
+The solver source code can either be imported as a library or used as a program. If it is used as a
+program, simply supply to standard input a 9x9 grid of numbers with spaces in between (or preferably
+redirect stdin from a file). You can see example inputs in the problems directory.
+
+Example input:
+```text
+0 6 0 0 4 0 0 0 5
+4 0 3 0 0 0 0 2 0
+9 2 0 1 7 0 0 0 0
+7 3 0 4 0 0 0 9 0
+0 0 0 0 0 0 0 0 0
+0 9 0 0 0 2 0 1 6
+0 0 0 0 8 7 0 4 1
+0 1 0 0 0 0 8 0 9
+8 0 0 0 6 0 0 3 0
+```
+
+This solver was built and tested using Python3.7 and may not work with older versions.
+
+## Methods
+
 ### Single Candidate and Single Position
 Single Candidate is when there is only one possibility for a cell, so we know that it must be the value,
 and Single Position is when there is only one place a value can go within a group.
